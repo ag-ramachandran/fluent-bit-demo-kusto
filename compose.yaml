@@ -1,0 +1,33 @@
+version: '3.8'
+services:
+  fluentbit:
+    image: agramachandran/fluent-bit:2.2.4-AMD64
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    volumes:
+      - ./:/fluent-bit/etc/
+    environment:
+      - TENANT_ID=${TENANT_ID}
+      - CLIENT_ID=${CLIENT_ID}
+      - CLIENT_SECRET=${CLIENT_SECRET}
+      - DATA_INGESTION_URI=${DATA_INGESTION_URI}
+      - DB_NAME=${DB_NAME}
+      - TABLE_NAME_NGINX=${TABLE_NAME_NGINX}
+  flog:
+    image: mingrammer/flog
+    command: '-l'
+    depends_on:
+      - fluentbit
+    logging:
+      driver: fluentd
+      options:
+        tag: apache
+  nginx:
+    image: kscarlett/nginx-log-generator
+    depends_on:
+      - fluentbit
+    logging:
+      driver: fluentd
+      options:
+        tag: nginx
