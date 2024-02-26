@@ -1,0 +1,35 @@
+// Create table command
+////////////////////////////////////////////////////////////
+.create table ['RawWebServerLogs']  (['timestamp']:datetime, ['tag']:string, ['log']:dynamic)
+
+// Create mapping command
+////////////////////////////////////////////////////////////
+.create table ['RawWebServerLogs'] ingestion json mapping 'RawWebServerLogs_mapping' '[{"column":"timestamp", "Properties":{"Path":"$[\'timestamp\']"}},{"column":"tag", "Properties":{"Path":"$[\'tag\']"}},{"column":"log", "Properties":{"Path":"$[\'log\']"}}]'
+
+
+// Create update policy
+////////////////////////////////////////////////////////////
+
+.create function
+    with (docstring = 'Parses raw records into strongly-typed columns', folder = 'UpdatePolicyFunctions')
+    ExtractWebServerLogs() {
+     RawWebServerLogs
+    | mv-expand rawlog
+    | extend remoteip=tostring(log['remote'])
+    | extend host=tostring(log['host'])
+    | extend user=tostring(log['user'])
+    | extend method=tostring(log['method'])
+    | extend path=tostring(log['path'])
+    | extend code=toint(log['code'])
+    | extend size=tolong(log['size'])
+    | extend referer=tostring(log['referer'])
+    | extend agent=tostring(log['agent'])
+    | project-away rawlog
+ }
+
+// Create a target downstream table
+////////////////////////////////////////////////////////////
+.create table WebServerLogs (timestamp:datetime, source:string, remoteip:string, host:string, user:string,method:string ,path:string ,code:int, size:long, referer:string,agent:string)
+
+// Mix-in the update policy
+.alter table WebServerLogs policy update @'[{ "IsEnabled": true, "Source": "RawWebServerLogs", "Query": "ExtractWebServerLogs()", "IsTransactional": true, "PropagateIngestionProperties": false}]'
